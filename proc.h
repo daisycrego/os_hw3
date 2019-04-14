@@ -10,7 +10,7 @@ struct cpu {
   volatile uint started;       // Has the CPU started?
   int ncli;                    // Depth of pushcli nesting.
   int intena;                  // Were interrupts enabled before pushcli?
-  int totalNumTickets;         // Total number of tickets awarded across all processes (for lottery scheduling)
+  int numTicketsTotal;         // Total number of tickets awarded across all processes (for lottery scheduling)
 
   // Cpu-local storage variables; see below
   struct cpu *cpu;
