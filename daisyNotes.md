@@ -1,6 +1,3 @@
-require 'markdown_checkboxes'
-parser = CheckboxMarkdown.new(Redcarpet::Render::HTML.new())
-markdown = <<-MARKDOWN
 # Set-up notes
 - Cloned the new xv6-public folder to csgy6233/
 - In order to track my own work on git, I will change the origin’s url to one for my own repository so that I can push up to there. I’m especially noting the details of how I did this because later on, I will need to switch back to push my patch.
@@ -21,16 +18,16 @@ make qemu CPUS=1
 ```
 
 # Plan:
-[] Add tickets to struct proc.
+1. Add tickets to struct proc.
   - proc.h includes the definition of the per-process proc struct, so we will add tickets in here.
-[] Add some global tickets value (maybe to the CPU state struct also defined in proc.h)
-[] Assign new processes 20 lottery tickets when they are created:
+2. Add some global tickets value (maybe to the CPU state struct also defined in proc.h)
+3. Assign new processes 20 lottery tickets when they are created:
 proc.c includes the initialization of the proc structure for the first user process. We will want to set the number of lottery tickets here.
-[] When the scheduler runs, it picks a random number between 0 and the total number of tickets. It then uses the algorithm described in class to pick the next process.
+4. When the scheduler runs, it picks a random number between 0 and the total number of tickets. It then uses the algorithm described in class to pick the next process.
   - The scheduler function is defined within proc.c.
-[] Create a system call, ```settickets```, that allows a process to specify how many lottery tickets it wants.
+5. Create a system call, ```settickets```, that allows a process to specify how many lottery tickets it wants.
   - Instructions on how to create a system call are in the slides.
-[] Test the scheduler
+6. Test the scheduler
   - Use lotterytest (add lottery test to the UPROGS list in the Makefile)
 
 # Lottery scheduling
