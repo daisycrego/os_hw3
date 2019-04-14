@@ -105,6 +105,7 @@ userinit(void)
   p->state = RUNNABLE;
 
   p->numTickets = 20; //Each process has 20 tickets initially (for lottery scheduling).
+  cpu->numTicketsTotal = 20;
 }
 
 // Grow current process's memory by n bytes.
