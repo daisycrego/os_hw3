@@ -19,28 +19,28 @@ make qemu CPUS=1
 
 # Plan:
 1. Add tickets to struct proc.
-  - proc.h includes the definition of the per-process proc struct, so we will add tickets in here.
+    - proc.h includes the definition of the per-process proc struct, so we will add tickets in here.
 2. Add some global tickets value (maybe to the CPU state struct also defined in proc.h)
 3. Assign new processes 20 lottery tickets when they are created:
 proc.c includes the initialization of the proc structure for the first user process. We will want to set the number of lottery tickets here.
 4. When the scheduler runs, it picks a random number between 0 and the total number of tickets. It then uses the algorithm described in class to pick the next process.
-  - The scheduler function is defined within proc.c.
+    - The scheduler function is defined within proc.c.
 5. Create a system call, ```settickets```, that allows a process to specify how many lottery tickets it wants.
-  - Instructions on how to create a system call are in the slides.
+    - Instructions on how to create a system call are in the slides.
 6. Test the scheduler
-  - Use lotterytest (add lottery test to the UPROGS list in the Makefile)
+    - Use lotterytest (add lottery test to the UPROGS list in the Makefile)
 
 # Lottery scheduling
 ### Overview:
-Give each process a fixed number of lottery tickets. Effectively giving each process a proportion of the CPU by just giving it that proportion of the tickets.
-When it comes time to schedule, pick a random number between 1 and the number of tickets.
-Schedule the process that won the lottery.
+- Give each process a fixed number of lottery tickets. Effectively giving each process a proportion of the CPU by just giving it that proportion of the tickets.
+- When it comes time to schedule, pick a random number between 1 and the number of tickets.
+- Schedule the process that won the lottery.
 ### Specifics:
-Take the existing PCB (struct proc) and augment it with a num_tickets field.
-At scheduling time:
-Generate a random ticket number winner
-Loop over processes, keeping a counter
-If counter >= winner then pick that process
+- Take the existing PCB (struct proc) and augment it with a num_tickets field.
+- At scheduling time:
+  - Generate a random ticket number winner
+  - Loop over processes, keeping a counter
+  - If counter >= winner then pick that process
 ### Algorithm:
 For an array of processes (proc[NUM_OF_PROCS]), each with its associated number of tickets (num_tickets):
 ```
@@ -66,7 +66,7 @@ for each process in proc[NUM_OF_PROCS]:
       - Method B:
         - During userinit, give the first user process 20 tickets and increment numTicketsTotal by 20.
         - Each time a fork occurs, give the new user process 20 tickets (because its parent could have changed its number of tickets using settickets), and increment numTicketsTotal by 20.
- -[ ] @TODO: Make sure numTicketsTotal is cleaned up whenever a process is closed.
+ - @TODO: Make sure numTicketsTotal is cleaned up whenever a process is closed.
     - Method A:
       - During exit, decrement numTicketsTotal by numTickets in struct proc.
     - But is exit the only way to close a process? What code do all closing processes go through?
