@@ -66,7 +66,7 @@ for each process in proc[NUM_OF_PROCS]:
       - Method B:
         - During userinit, give the first user process 20 tickets and increment numTicketsTotal by 20.
         - Each time a fork occurs, give the new user process 20 tickets (because its parent could have changed its number of tickets using settickets), and increment numTicketsTotal by 20.
- [] @TODO: Make sure numTicketsTotal is cleaned up whenever a process is closed.
+ -[ ] @TODO: Make sure numTicketsTotal is cleaned up whenever a process is closed.
     - Method A:
       - During exit, decrement numTicketsTotal by numTickets in struct proc.
     - But is exit the only way to close a process? What code do all closing processes go through?
