@@ -1,3 +1,6 @@
+require 'markdown_checkboxes'
+parser = CheckboxMarkdown.new(Redcarpet::Render::HTML.new())
+
 # Set-up notes
 - Cloned the new xv6-public folder to csgy6233/
 - In order to track my own work on git, I will change the origin’s url to one for my own repository so that I can push up to there. I’m especially noting the details of how I did this because later on, I will need to switch back to push my patch.
@@ -101,3 +104,5 @@ kill(int pid)
 
 # Questions:
 Should we check whether a process is RUNNABLE before applying the algorithm? Or after? I think that doing it before would mess up the logic of the lottery…
+
+parser.render(markdown)
