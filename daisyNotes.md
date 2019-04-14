@@ -59,20 +59,24 @@ for each process in proc[NUM_OF_PROCS]:
 ```
 
 ### Execution
+  - Add default num of tickets (DEFTICKETS) variable to param.h.
   - Added numTickets to proc struct in proc.h
-  - Added numTicketsTotal to proc cpu in proc.h
+  - Add cpu-global numTicketsTotal
+    - Added numTicketsTotal to proc cpu in proc.h
+    - Initialize to 0 in main.c - mpmain().
   - Assigned each new process 20 tickets.
       - Method A: During userinit, give the first user process 20 tickets.
-      - Method B:
+      - Method B (**current implementation**):
         - During userinit, give the first user process 20 tickets and increment numTicketsTotal by 20.
         - Each time a fork occurs, give the new user process 20 tickets (because its parent could have changed its number of tickets using settickets), and increment numTicketsTotal by 20.
- - @TODO: Make sure numTicketsTotal is cleaned up whenever a process is closed.
-    - Method A:
+ - Make sure numTicketsTotal is cleaned up whenever a process is closed.
+    - Method A (**current implementation**):
       - During exit, decrement numTicketsTotal by numTickets in struct proc.
     - But is exit the only way to close a process? What code do all closing processes go through?
       - Kill
       - Exit
       - Wait…?
+- Changed the scheduler
 
 **? Are user processes the only ones "scheduled"?**
    - I think so, because the only way we end in the kernel is when we trap, interrupt, etc., no?
@@ -193,7 +197,7 @@ Let's look at fork:
   - Set process state to RUNNABLE.
   - Release lock.  
 4. Return pid (to the parent). The child will return somewhere else (forkret, which will return to trapret). This is very interesting. It's not like we can return in the child and parent "simultaneously". We have no choice when we will occur. That's up to the CPU and "fate". We set ourselves up, set our status to RUNNABLE, and wait. What's so crazy is, during this process of setting ourselves up, we may at any time be interrupted, our state saved, and then resumed at some later time without us knowing anything about it. Even something as complicated as what's going on here. No issue. Frozen and resumed later. Am I really a process? Do I imagine that the entire world is mine? But it's really virtual memory? Hard to say...
-- The elements that make up a process are finite. They can be saved, shelved, and picked back up at any time. In this case it just boils down to a few registers because from them, you can access everything that you need. That would be something interesting to look more into next. The full anatomy of a process, and how each element links to those few really important registers. 
+- The elements that make up a process are finite. They can be saved, shelved, and picked back up at any time. In this case it just boils down to a few registers because from them, you can access everything that you need. That would be something interesting to look more into next. The full anatomy of a process, and how each element links to those few really important registers.
 ```c
 // Create a new process copying p as the parent.
 // Sets up stack to return as if from system call.

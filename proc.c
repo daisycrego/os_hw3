@@ -102,10 +102,10 @@ userinit(void)
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
 
-  p->state = RUNNABLE;
+  p->numTickets = DEFTICKETS;
+  cpu->numTicketsTotal += DEFTICKETS;
 
-  p->numTickets = 20;
-  cpu->numTicketsTotal = 20;
+  p->state = RUNNABLE;
 }
 
 // Grow current process's memory by n bytes.
@@ -164,12 +164,11 @@ fork(void)
 
   pid = np->pid;
 
-  np->numTickets = 20; //Each process has 20 tickets initially (for lottery scheduling).
-  cpu->numTicketsTotal += 20;
+  np->numTickets = DEFTICKETS; //Each process has 20 tickets initially (for lottery scheduling).
+  cpu->numTicketsTotal += DEFTICKETS;
 
   // lock to force the compiler to emit the np->state write last.
   acquire(&ptable.lock);
-
   np->state = RUNNABLE;
   release(&ptable.lock);
 
@@ -213,6 +212,16 @@ exit(void)
       if(p->state == ZOMBIE)
         wakeup1(initproc);
     }
+  }
+
+  if (cpu->numTicketsTotal - p->numTickets < 0){
+    cprintf("numTickets: %d", p->numTickets);
+    cprintf("numTicketsTotal: %d", cpu->numTicketsTotal);
+    procdump();
+    panic("Negative number of tickets!");
+  }
+  else{
+    cpu->numTicketsTotal -= p->numTickets;
   }
 
   // Jump into the scheduler, never to return.
@@ -287,9 +296,19 @@ scheduler(void)
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
+    int counter = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
+      long winner = random_at_most(cpu->numTicketsTotal);
+      if (counter+(p->numTickets) >= winner){
+        if (p->state!= RUNNABLE){
+          counter+= p->numTickets;
+          continue;
+        }
+      }
+      else{
+        counter+= p->numTickets;
         continue;
+      }
 
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
