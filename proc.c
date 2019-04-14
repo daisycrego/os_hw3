@@ -104,7 +104,6 @@ userinit(void)
 
   p->state = RUNNABLE;
 
-  p->numTickets = 20; //Each process has 20 tickets initially (for lottery scheduling).
   cpu->numTicketsTotal = 20;
 }
 
@@ -164,8 +163,11 @@ fork(void)
 
   pid = np->pid;
 
+  np->numTickets = 20; //Each process has 20 tickets initially (for lottery scheduling).
+
   // lock to force the compiler to emit the np->state write last.
   acquire(&ptable.lock);
+
   np->state = RUNNABLE;
   release(&ptable.lock);
 
