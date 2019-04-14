@@ -69,6 +69,8 @@ for each process in proc[NUM_OF_PROCS]:
       - Method B (**current implementation**):
         - During userinit, give the first user process 20 tickets and increment numTicketsTotal by 20.
         - Each time a fork occurs, give the new user process 20 tickets (because its parent could have changed its number of tickets using settickets), and increment numTicketsTotal by 20.
+      - Method C:
+          - Don't give the first user process any tickets, it doesn't need them. Only award tickets during fork. Initialize cpu->numTicketsTotal to 0 here, not 20.
  - Make sure numTicketsTotal is cleaned up whenever a process is closed.
     - Method A (**current implementation**):
       - During exit, decrement numTicketsTotal by numTickets in struct proc.
@@ -76,6 +78,7 @@ for each process in proc[NUM_OF_PROCS]:
       - Kill
       - Exit
       - Wait…?
+    - But are user processes the only ones passing through exit? Could we end up with negative numTicketsTotal because non-user processes will also result in decrementing of numTicketsTotal?
 - Changed the scheduler
 
 **? Are user processes the only ones "scheduled"?**

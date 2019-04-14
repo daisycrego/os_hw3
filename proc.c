@@ -103,7 +103,7 @@ userinit(void)
   p->cwd = namei("/");
 
   p->numTickets = DEFTICKETS;
-  cpu->numTicketsTotal += DEFTICKETS;
+  cpu->numTicketsTotal = 0;
 
   p->state = RUNNABLE;
 }
@@ -166,6 +166,8 @@ fork(void)
 
   np->numTickets = DEFTICKETS; //Each process has 20 tickets initially (for lottery scheduling).
   cpu->numTicketsTotal += DEFTICKETS;
+  cprintf("fork, setting np->numTickets to %d, cpu->numTicketsTotal to %d\n", np->numTickets, cpu->numTicketsTotal);
+
 
   // lock to force the compiler to emit the np->state write last.
   acquire(&ptable.lock);
@@ -214,14 +216,16 @@ exit(void)
     }
   }
 
-  if (cpu->numTicketsTotal - p->numTickets < 0){
-    cprintf("numTickets: %d", p->numTickets);
-    cprintf("numTicketsTotal: %d", cpu->numTicketsTotal);
+  cprintf("numTickets: %d\n", proc->numTickets);
+  cprintf("numTicketsTotal: %d\n", cpu->numTicketsTotal);
+  if (cpu->numTicketsTotal - proc->numTickets < 0){
+    cprintf("numTickets: %d\n", proc->numTickets);
+    cprintf("numTicketsTotal: %d\n", cpu->numTicketsTotal);
     procdump();
-    panic("Negative number of tickets!");
+    panic("Negative number of tickets!\n");
   }
   else{
-    cpu->numTicketsTotal -= p->numTickets;
+    cpu->numTicketsTotal -= proc->numTickets;
   }
 
   // Jump into the scheduler, never to return.
@@ -489,7 +493,8 @@ procdump(void)
       state = states[p->state];
     else
       state = "???";
-    cprintf("%d %s %s", p->pid, state, p->name);
+    cprintf("pid state name numOfTickets\n");
+    cprintf("%d %s %s %d", p->pid, state, p->name, p->numTickets);
     if(p->state == SLEEPING){
       getcallerpcs((uint*)p->context->ebp+2, pc);
       for(i=0; i<10 && pc[i] != 0; i++)
