@@ -104,7 +104,6 @@ userinit(void)
 
   cpu->numTicketsTotal = 0;
 
-
   p->state = RUNNABLE;
 }
 
