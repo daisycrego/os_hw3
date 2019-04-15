@@ -91,6 +91,8 @@ for each process in proc[NUM_OF_PROCS]:
 - Ran testLottery: forks, in child runs normally, in the parent sleeps forever. Checks whether numTicketsTotal is incremented properly.
 - Ran lotterytest: Awards 2 processes different number of tickets (20 vs 80), runs CPU-intensive spin program, clocks runtimes of each.
   - Added lotterytest to UPROGS in Makefile
+  - Ran 100 and then 500 and then 1000 times. During the 1000x run, we recorded the random number selected by the scheduler. The distribution of the winning numbers was ____(uniform, non-uniform).
+
 
 **? Are user processes the only ones "scheduled"?**
    - I think so, because the only way we end in the kernel is when we trap, interrupt, etc., no?
