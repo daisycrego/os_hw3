@@ -67,7 +67,60 @@ proc.c includes the initialization of the proc structure for the first user proc
           - **Exit**
           - Wait - too late
         - But are user processes the only ones passing through exit? Could we end up with negative numTicketsTotal because non-user processes will also result in decrementing of numTicketsTotal? No. This is a scheduler of user processes. These user processes may invoke the kernel at any point in their execution, but no kernel processes will be scheduled.  
-    - Changed the scheduler
+    - Changed the scheduler:
+```c
+    void
+    scheduler(void)
+    {
+      //cprintf("ENTERING THE SCHEDULER!\n");
+      //procdump();
+
+      struct proc \*p;
+      int foundproc = 1;
+
+      for(;;){
+        // Enable interrupts on this processor.
+        sti();
+
+        if (!foundproc) hlt();
+        foundproc = 0;
+
+        // Loop over process table looking for process to run.
+        acquire(&ptable.lock);
+        int counter = 0;
+        for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+          long winner = random_at_most(cpu->numTicketsTotal);
+          if (counter+(p->numTickets) >= winner){
+            if (p->state!= RUNNABLE){
+              counter+= p->numTickets;
+              continue;
+            }
+          }
+          else{
+            counter+= p->numTickets;
+            continue;
+          }
+
+          // Switch to chosen process.  It is the process's job
+          // to release ptable.lock and then reacquire it
+          // before jumping back to us.
+          foundproc = 1;
+          proc = p;
+          switchuvm(p);
+          p->state = RUNNING;
+          swtch(&cpu->scheduler, proc->context);
+          switchkvm();
+
+          // Process is done running for now.
+          // It should have changed its p->state before coming back.
+          proc = 0;
+        }
+        release(&ptable.lock);
+
+      }
+    }
+    ```
+
     - Added the settickets system call.
       - Add settickets to syscall.c
       - Assign it a number in syscall.h
@@ -91,5 +144,3 @@ proc.c includes the initialization of the proc structure for the first user proc
       I don't see any significant imbalance in scheduling between the 2 processes over time.
 
       But what about more processes? How fair will lottery scheduling be then?
-
-  

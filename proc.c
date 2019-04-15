@@ -304,9 +304,6 @@ wait(void)
 void
 scheduler(void)
 {
-  //cprintf("ENTERING THE SCHEDULER!\n");
-  //procdump();
-
   struct proc *p;
   int foundproc = 1;
 
