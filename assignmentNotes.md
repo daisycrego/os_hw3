@@ -5,68 +5,80 @@ cd /home/root/xv6-public/
 cd /home/root/xv6-public/ && make && make qemu-nox CPUS=1
 ```
 
-# Plan:
-1. Add tickets to struct proc.
-    - proc.h includes the definition of the per-process proc struct, so we will add tickets in here.
-2. Add some global tickets value (maybe to the CPU state struct also defined in proc.h)
-3. Assign new processes 20 lottery tickets when they are created:
-proc.c includes the initialization of the proc structure for the first user process. We will want to set the number of lottery tickets here.
-4. When the scheduler runs, it picks a random number between 0 and the total number of tickets. It then uses the algorithm described in class to pick the next process.
-    - The scheduler function is defined within proc.c.
-5. Create a system call, ```settickets```, that allows a process to specify how many lottery tickets it wants.
+# Lottery scheduling
+### Overview:
+- Give each process a fixed number of lottery tickets. Effectively giving each process a proportion of the CPU by just giving it that proportion of the tickets.
+- When it comes time to schedule, pick a random number between 1 and the number of tickets.
+- Schedule the process that won the lottery.
+### Specifics:
+- Take the existing PCB (struct proc) and augment it with a num_tickets field.
+- At scheduling time:
+  - Generate a random ticket number winner
+  - Loop over processes, keeping a counter
+  - If counter >= winner then pick that process
+### Algorithm:
+For an array of processes (proc[NUM_OF_PROCS]), each with its associated number of tickets (num_tickets):
+```
+for each process in proc[NUM_OF_PROCS]:
+  counter = 0
+  winner = random number between 0 and total number of tickets
+  if counter+process[num_of_tickets] >= winner:
+    if process[state] == RUNNABLE
+      run the process
+    else
+    continue
+  else:
+    counter+=process[num_of_tickets]
+    continue
+
+```
+
+# Execution
+1. Keep track of per-process tickets.
+  - How: Add int numTickets to the process control block (struct proc).
+  - Implementation:
+2. Keep track of total tickets (across all processes).
+  - How: Store int numTicketsTotal along with other per-processor variables (struct cpu).  
+  - Implementation:
+3. Assign new user processes lottery tickets when they are created. A child will be awarded the same number of tickets as their parent in this implementation. Update total number of tickets after each allocation:
+  - How:  
+    - Most user processes are created by the shell (fork + exec), so award tickets during fork to the child process.
+    - But, some user processes are not the result of a fork, so they will need their tickets to be awarded explicitly.  
+      - The init process (the first user process)
+      - The shell (called by the first user process)
+  - Implementation:
+4. When a process exits, update total number of tickets.
+  - How: During exit, decrement cpu->numTicketsTotal.
+  - Implementation:
+5. Revise the scheduler:
+  - How:
+  - Implementation:
+6. Create a system call, ```settickets```, that allows a process to specify how many lottery tickets it wants.
     - Instructions on how to create a system call are in the slides.
 6. Test the scheduler
     - Use lotterytest (add lottery test to the UPROGS list in the Makefile)
 
-    # Lottery scheduling
-    ### Overview:
-    - Give each process a fixed number of lottery tickets. Effectively giving each process a proportion of the CPU by just giving it that proportion of the tickets.
-    - When it comes time to schedule, pick a random number between 1 and the number of tickets.
-    - Schedule the process that won the lottery.
-    ### Specifics:
-    - Take the existing PCB (struct proc) and augment it with a num_tickets field.
-    - At scheduling time:
-      - Generate a random ticket number winner
-      - Loop over processes, keeping a counter
-      - If counter >= winner then pick that process
-    ### Algorithm:
-    For an array of processes (proc[NUM_OF_PROCS]), each with its associated number of tickets (num_tickets):
-    ```
-    for each process in proc[NUM_OF_PROCS]:
-    	counter = 0
-    	winner = random number between 0 and total number of tickets
-    	if counter+process[num_of_tickets] >= winner:
-    		if process[state] == RUNNABLE
-    			run the process
-    		else
-    		continue
-    	else:
-    		counter+=process[num_of_tickets]
-    		continue
-
-    ```
-
-    ### Execution
-      - Add default num of tickets (DEFTICKETS) variable to param.h.
-      - Added numTickets to proc struct in proc.h
-      - Add cpu-global numTicketsTotal
-        - Added numTicketsTotal to proc cpu in proc.h
-        - Initialize to 0 in main.c - mpmain().
-      - Assigned each new process 20 tickets.
-          - Method A: During userinit, give the first user process 20 tickets.
-          - **Method B** (**current implementation**):
-            - During userinit, give the first user process 20 tickets and increment numTicketsTotal by 20.
-            - Each time a fork occurs, give the new user process 20 tickets (because its parent could have changed its number of tickets using settickets), and increment numTicketsTotal by 20.
-            - When userinit calls shell, give shell 20 tickets (because shell isn't called by fork, while all processes that it calls will be fine because of fork... )
-              - sh.c: explicitly give sh tickets here.
-     - Make sure numTicketsTotal is cleaned up whenever a process is closed.
-        - Method A (**current implementation**):
-          - During exit, decrement numTicketsTotal by numTickets in struct proc.
-        - But is exit the only way to close a process? What code do all closing processes go through?
-          - Kill - calls exit
-          - **Exit**
-          - Wait - too late
-        - But are user processes the only ones passing through exit? Could we end up with negative numTicketsTotal because non-user processes will also result in decrementing of numTicketsTotal? No. This is a scheduler of user processes. These user processes may invoke the kernel at any point in their execution, but no kernel processes will be scheduled.  
+### Details
+  - Add default num of tickets (DEFTICKETS) variable to param.h.
+  - Added numTickets to proc struct in proc.h
+  - Add cpu-global numTicketsTotal
+    - Added numTicketsTotal to proc cpu in proc.h
+    - Initialize to 0 in main.c - mpmain().
+  - Assigned each new process 20 tickets.
+      - Method A: During userinit, give the first user process 20 tickets.
+      - **Method B** (**current implementation**):
+        - During userinit, give the first user process 20 tickets and increment numTicketsTotal by 20.
+        - Each time a fork occurs, give the new user process 20 tickets (because its parent could have changed its number of tickets using settickets), and increment numTicketsTotal by 20.
+        - When userinit calls shell, give shell 20 tickets (because shell isn't called by fork, while all processes that it calls will be fine because of fork... )
+          - sh.c: explicitly give sh tickets here.
+ - Make sure numTicketsTotal is cleaned up whenever a process is closed.
+    - Method A (**current implementation**):
+      - During exit, decrement numTicketsTotal by numTickets in struct proc.
+    - But is exit the only way to close a process? What code do all closing processes go through?
+      - Kill - calls exit
+      - **Exit**
+      - Wait - too late
+    - But are user processes the only ones passing through exit? Could we end up with negative numTicketsTotal because non-user processes will also result in decrementing of numTicketsTotal? No. This is a scheduler of user processes. These user processes may invoke the kernel at any point in their execution, but no kernel processes will be scheduled.  
     - Changed the scheduler:
 ```c
     void
