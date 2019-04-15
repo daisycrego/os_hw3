@@ -1,3 +1,5 @@
+
+
 # Set-up notes
 - Cloned the new xv6-public folder to csgy6233/
 - In order to track my own work on git, I will change the origin’s url to one for my own repository so that I can push up to there. I’m especially noting the details of how I did this because later on, I will need to switch back to push my patch.
@@ -12,9 +14,10 @@ git push origin master
 I can now checkout the hw4 branch no problem and all of the files are on git.
 
 ## Testing the scheduler:
-Make sure to set the CPUs to 1:
 ```
-make qemu CPUS=1
+docker run -v '/Users/porkchop/Library/Mobile Documents/com~apple~CloudDocs/csgy6233/xv6-public/':'/home/root/xv6-public' -it xv6 bash
+cd /home/root/xv6-public/
+cd /home/root/xv6-public/ && make && make qemu-nox CPUS=1
 ```
 
 # Plan:
@@ -66,21 +69,19 @@ for each process in proc[NUM_OF_PROCS]:
     - Initialize to 0 in main.c - mpmain().
   - Assigned each new process 20 tickets.
       - Method A: During userinit, give the first user process 20 tickets.
-      - Method B (**current implementation**):
+      - **Method B** (**current implementation**):
         - During userinit, give the first user process 20 tickets and increment numTicketsTotal by 20.
-        - When userinit calls shell, give shell 20 tickets (because shell isn't called by fork, all processes that it calls will be fine because of fork... )
-          - sh.c: explicitly give sh tickets here.
         - Each time a fork occurs, give the new user process 20 tickets (because its parent could have changed its number of tickets using settickets), and increment numTicketsTotal by 20.
-      - Method C:
-          - Don't give the first user process any tickets, it doesn't need them. Only award tickets during fork. Initialize cpu->numTicketsTotal to 0 here, not 20.
+        - When userinit calls shell, give shell 20 tickets (because shell isn't called by fork, while all processes that it calls will be fine because of fork... )
+          - sh.c: explicitly give sh tickets here.
  - Make sure numTicketsTotal is cleaned up whenever a process is closed.
     - Method A (**current implementation**):
       - During exit, decrement numTicketsTotal by numTickets in struct proc.
     - But is exit the only way to close a process? What code do all closing processes go through?
-      - Kill
-      - Exit
-      - Wait…?
-    - But are user processes the only ones passing through exit? Could we end up with negative numTicketsTotal because non-user processes will also result in decrementing of numTicketsTotal?
+      - Kill - calls exit
+      - **Exit**
+      - Wait - too late
+    - But are user processes the only ones passing through exit? Could we end up with negative numTicketsTotal because non-user processes will also result in decrementing of numTicketsTotal? No. This is a scheduler of user processes. These user processes may invoke the kernel at any point in their execution, but no kernel processes will be scheduled.  
 - Changed the scheduler
 - Added the settickets system call.
   - Add settickets to syscall.c
@@ -89,13 +90,25 @@ for each process in proc[NUM_OF_PROCS]:
   - Add it to usys.S, which generates the user-space assembly code for it
   - Add implementation in sysproc.c
 - Ran testLottery: forks, in child runs normally, in the parent sleeps forever. Checks whether numTicketsTotal is incremented properly.
-- Ran lotterytest: Awards 2 processes different number of tickets (20 vs 80), runs CPU-intensive spin program, clocks runtimes of each.
+- Ran lotterytest: Awards 2 processes a different number of tickets (20 vs 80), runs CPU-intensive spin program, clocks runtimes of each.
   - Added lotterytest to UPROGS in Makefile
   - Ran 100 and then 500 and then 1000 times. During the 1000x run, we recorded the random number selected by the scheduler. The distribution of the winning numbers was ____(uniform, non-uniform).
 
+  A=100
+  B=500
+
+  Tickets	Average Duration
+  A 20	8.32
+  A 80	6.89
+  B 20	8.29
+  B 80	6.84
+
+  I don't see any significant imbalance in scheduling between the 2 processes over time.
+
+  But what about more processes? How fair will lottery scheduling be then?
 
 **? Are user processes the only ones "scheduled"?**
-   - I think so, because the only way we end in the kernel is when we trap, interrupt, etc., no?
+   - Yes. The scheduler loops through the proc table, which selects a RUNNABLE user process from the process table (ptable). There isn't really a scheduling of kernel processes. There is no protection because all processes run with equal priority. (?)
 
 ### Let's trace the lifetime of a user process, or processes in general in xv6. Looking in proc.c:
 
@@ -119,7 +132,6 @@ void userinit(void)
 ```
 
 userinit calls allocproc during its execution to find an UNUSED process in the process table, change its state to EMBRYO, and do some other initializations:
-
 ```c
 //PAGEBREAK: 32
 // Look in the process table for an UNUSED proc.
@@ -143,7 +155,6 @@ found:
   p->state = EMBRYO;
   p->pid = nextpid++;
   release(&ptable.lock);
-
 ...
 
   // Set up new context to start executing at forkret,
@@ -208,12 +219,13 @@ Let's look at fork:
     ```
     7. Sets pid to np->pid (this will be returned to the parent).
     8. **Sets np->numTickets to 20 and increments cpu->numTicketsTotal by 20.**
-3.  Force the compiler to emit the np->state write last (so the scheduler won't intercept this process and schedule it before it's ready).
-  - Acquire lock on the process table.
-  - Set process state to RUNNABLE.
-  - Release lock.  
-4. Return pid (to the parent). The child will return somewhere else (forkret, which will return to trapret). This is very interesting. It's not like we can return in the child and parent "simultaneously". We have no choice when we will occur. That's up to the CPU and "fate". We set ourselves up, set our status to RUNNABLE, and wait. What's so crazy is, during this process of setting ourselves up, we may at any time be interrupted, our state saved, and then resumed at some later time without us knowing anything about it. Even something as complicated as what's going on here. No issue. Frozen and resumed later. Am I really a process? Do I imagine that the entire world is mine? But it's really virtual memory? Hard to say...
-- The elements that make up a process are finite. They can be saved, shelved, and picked back up at any time. In this case it just boils down to a few registers because from them, you can access everything that you need. That would be something interesting to look more into next. The full anatomy of a process, and how each element links to those few really important registers.
+3.  Forces the compiler to emit the np->state write last (so the scheduler won't intercept this process and schedule it before it's ready).
+  - Acquires lock on the process table.
+  - Sets process state to RUNNABLE.
+  - Releases lock.  
+4. Returns pid (to the parent). The child will return somewhere else (forkret, which will return to trapret). This is very interesting. It's not like we can return in the child and parent "simultaneously". We have no choice when we will occur. That's up to the CPU and "fate". We set ourselves up, set our status to RUNNABLE, and wait. What's so crazy is, during this process of setting ourselves up, we may at any time be interrupted, our state saved, and then resumed at some later time without us knowing anything about it. Even something as complicated as what's going on here. No issue. Frozen and resumed later.
+- The elements that make up a process are finite. They can be saved, shelved, and picked back up at any time. In this case it just boils down to a few registers because from them, you can access everything that you need.
+= **That would be something interesting to look more into next. The full anatomy of a process, and how each element links to those few really important registers.**
 ```c
 // Create a new process copying p as the parent.
 // Sets up stack to return as if from system call.
@@ -264,8 +276,6 @@ int fork(void)
 ```
 
 Now let's look at returning in the child:
-
-
 
 Now let's look at returning in the parent:
 
@@ -401,34 +411,3 @@ wait(void)
 
 # Questions:
 - Should we check whether a process is RUNNABLE before applying the algorithm? Or after? I think that doing it before would mess up the logic of the lottery…
-
-# Testing:
-
-- Output without setting numTickets=DEFTICKETS within fork:
-init: starting sh
-fork, setting np->numTickets to 0, cpu->numTicketsTotal to 20
-$ lotterytest
-fork, setting np->numTickets to 0, cpu->numTicketsTotal to 40
-starting test at 20 hours 1 minutes 29 seconds
-fork, setting np->numTickets to 0, cpu->numTicketsTotal to 60
-pid: 4
-fork, setting np->numTickets to 0, cpu->numTicketsTotal to 80
-pid: 5
-spin with 80 tickets ended at 20 hours 1 minutes 45 seconds
-numTickets: 16843009
-numTicketsTotal: 80
-numTickets: 16843009
-numTicketsTotal: 80
-pid state name numTickets
-1 sleep  init 20 80104ee4 80104c4d 801065ea 801057fc 80106a40 80106831
-pid state name numTickets
-2 sleep  sh 0 80104ee4 80104c4d 801065ea 801057fc 80106a40 80106831
-pid state name numTickets
-3 runble lotterytest 0
-pid state name numTickets
-4 run    lotterytest 16843009
-pid state name numTickets
-5 runble lotterytest 16843009
-cpu0: panic: Negative number of tickets!
-
- 80104b00 801065d8 801057fc 80106a40 80106831 0 0 0 0 0
