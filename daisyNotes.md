@@ -68,6 +68,8 @@ for each process in proc[NUM_OF_PROCS]:
       - Method A: During userinit, give the first user process 20 tickets.
       - Method B (**current implementation**):
         - During userinit, give the first user process 20 tickets and increment numTicketsTotal by 20.
+        - When userinit calls shell, give shell 20 tickets (because shell isn't called by fork, all processes that it calls will be fine because of fork... )
+          - sh.c: explicitly give sh tickets here.
         - Each time a fork occurs, give the new user process 20 tickets (because its parent could have changed its number of tickets using settickets), and increment numTicketsTotal by 20.
       - Method C:
           - Don't give the first user process any tickets, it doesn't need them. Only award tickets during fork. Initialize cpu->numTicketsTotal to 0 here, not 20.
@@ -80,6 +82,15 @@ for each process in proc[NUM_OF_PROCS]:
       - Wait…?
     - But are user processes the only ones passing through exit? Could we end up with negative numTicketsTotal because non-user processes will also result in decrementing of numTicketsTotal?
 - Changed the scheduler
+- Added the settickets system call.
+  - Add settickets to syscall.c
+  - Assign it a number in syscall.h
+  - Give it a prototype in user.h
+  - Add it to usys.S, which generates the user-space assembly code for it
+  - Add implementation in sysproc.c
+- Ran testLottery: forks, in child runs normally, in the parent sleeps forever. Checks whether numTicketsTotal is incremented properly.
+- Ran lotterytest: Awards 2 processes different number of tickets (20 vs 80), runs CPU-intensive spin program, clocks runtimes of each.
+  - Added lotterytest to UPROGS in Makefile
 
 **? Are user processes the only ones "scheduled"?**
    - I think so, because the only way we end in the kernel is when we trap, interrupt, etc., no?
@@ -388,3 +399,34 @@ wait(void)
 
 # Questions:
 - Should we check whether a process is RUNNABLE before applying the algorithm? Or after? I think that doing it before would mess up the logic of the lottery…
+
+# Testing:
+
+- Output without setting numTickets=DEFTICKETS within fork:
+init: starting sh
+fork, setting np->numTickets to 0, cpu->numTicketsTotal to 20
+$ lotterytest
+fork, setting np->numTickets to 0, cpu->numTicketsTotal to 40
+starting test at 20 hours 1 minutes 29 seconds
+fork, setting np->numTickets to 0, cpu->numTicketsTotal to 60
+pid: 4
+fork, setting np->numTickets to 0, cpu->numTicketsTotal to 80
+pid: 5
+spin with 80 tickets ended at 20 hours 1 minutes 45 seconds
+numTickets: 16843009
+numTicketsTotal: 80
+numTickets: 16843009
+numTicketsTotal: 80
+pid state name numTickets
+1 sleep  init 20 80104ee4 80104c4d 801065ea 801057fc 80106a40 80106831
+pid state name numTickets
+2 sleep  sh 0 80104ee4 80104c4d 801065ea 801057fc 80106a40 80106831
+pid state name numTickets
+3 runble lotterytest 0
+pid state name numTickets
+4 run    lotterytest 16843009
+pid state name numTickets
+5 runble lotterytest 16843009
+cpu0: panic: Negative number of tickets!
+
+ 80104b00 801065d8 801057fc 80106a40 80106831 0 0 0 0 0

@@ -102,8 +102,8 @@ userinit(void)
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
 
-  p->numTickets = DEFTICKETS;
   cpu->numTicketsTotal = 0;
+
 
   p->state = RUNNABLE;
 }
@@ -163,11 +163,20 @@ fork(void)
   safestrcpy(np->name, proc->name, sizeof(proc->name));
 
   pid = np->pid;
+  np->numTickets = proc->numTickets;
 
-  np->numTickets = DEFTICKETS; //Each process has 20 tickets initially (for lottery scheduling).
-  cpu->numTicketsTotal += DEFTICKETS;
-  cprintf("fork, setting np->numTickets to %d, cpu->numTicketsTotal to %d\n", np->numTickets, cpu->numTicketsTotal);
-
+  //np->numTickets = DEFTICKETS; //Each process has 20 tickets initially (for lottery scheduling).
+  //cprintf("np->numTickets: %d\n", proc->numTickets);
+  //cprintf("cpu->numTicketsTotal: %d\n", cpu->numTicketsTotal);
+  //cprintf("%d is FORKING\n", proc->pid);
+  //procdump();
+  //cprintf("BEFORE: proc->numTickets: %d\n", proc->numTickets);
+  //cprintf("BEFORE: cpu->numTicketsTotal: %d\n", cpu->numTicketsTotal);
+  cpu->numTicketsTotal += proc->numTickets;
+  //cprintf("AFTER: cpu->numTicketsTotal: %d\n", cpu->numTicketsTotal);
+  //procdump();
+  //cprintf("Adding tickets... \n");
+  //cprintf("cpu->numTicketsTotal: %d\n", cpu->numTicketsTotal);
 
   // lock to force the compiler to emit the np->state write last.
   acquire(&ptable.lock);
@@ -216,17 +225,25 @@ exit(void)
     }
   }
 
-  cprintf("numTickets: %d\n", proc->numTickets);
-  cprintf("numTicketsTotal: %d\n", cpu->numTicketsTotal);
+  //cprintf("Exiting process %d\n", proc->pid);
+  //cprintf("Before tickets are removed:\n");
+  //cprintf("numTickets: %d\n", proc->numTickets);
+  //cprintf("numTicketsTotal: %d\n", cpu->numTicketsTotal);
+  //procdump();
+
   if (cpu->numTicketsTotal - proc->numTickets < 0){
-    cprintf("numTickets: %d\n", proc->numTickets);
-    cprintf("numTicketsTotal: %d\n", cpu->numTicketsTotal);
-    procdump();
+    //cprintf("Failing during exit of %d\n", proc->pid);
+    //procdump();
     panic("Negative number of tickets!\n");
   }
-  else{
-    cpu->numTicketsTotal -= proc->numTickets;
-  }
+  cpu->numTicketsTotal -= proc->numTickets;
+
+
+  //cprintf("After tickets are removed:\n");
+  //cprintf("numTickets: %d\n", proc->numTickets);
+  //cprintf("numTicketsTotal: %d\n", cpu->numTicketsTotal);
+  //procdump();
+
 
   // Jump into the scheduler, never to return.
   proc->state = ZOMBIE;
@@ -288,6 +305,9 @@ wait(void)
 void
 scheduler(void)
 {
+  //cprintf("ENTERING THE SCHEDULER!\n");
+  //procdump();
+
   struct proc *p;
   int foundproc = 1;
 
@@ -486,6 +506,7 @@ procdump(void)
   char *state;
   uint pc[10];
 
+  //cprintf("pid state name numTickets\n");
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->state == UNUSED)
       continue;
@@ -493,7 +514,6 @@ procdump(void)
       state = states[p->state];
     else
       state = "???";
-    cprintf("pid state name numOfTickets\n");
     cprintf("%d %s %s %d", p->pid, state, p->name, p->numTickets);
     if(p->state == SLEEPING){
       getcallerpcs((uint*)p->context->ebp+2, pc);

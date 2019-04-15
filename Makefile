@@ -175,6 +175,8 @@ UPROGS=\
 	_zombie\
 	_hackbench\
 	_testLottery\
+	_lotterytest\
+	_callLotteryTestMultipleTimes\
 
 fs.img: mkfs README $(UPROGS)
 	./mkfs fs.img README $(UPROGS)

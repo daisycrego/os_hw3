@@ -61,7 +61,7 @@ sys_sleep(void)
 {
   int n;
   uint ticks0;
-  
+
   if(argint(0, &n) < 0)
     return -1;
   acquire(&tickslock);
@@ -83,7 +83,7 @@ int
 sys_uptime(void)
 {
   uint xticks;
-  
+
   acquire(&tickslock);
   xticks = ticks;
   release(&tickslock);
@@ -96,5 +96,20 @@ sys_gettime(void) {
   if (argptr(0, (char **)&d, sizeof(struct rtcdate)) < 0)
       return -1;
   cmostime(d);
+  return 0;
+}
+
+int
+sys_settickets(void){
+  int inputNumTickets;
+  if(argint(0, &inputNumTickets) < 0) //get me the 0th parameter from the user’s stack - argint  is doing “surgery” on the trap frame, and store it in the local pid variable, which is on the kernel stack - effectively we are fishing it out of the user stack and putting it on the kernel stack
+      return -1;
+  else{
+    //cprintf("inputNumTickets: %d\n", inputNumTickets);
+    int oldNumTickets = proc->numTickets;
+    proc->numTickets = inputNumTickets;
+    cpu->numTicketsTotal += (inputNumTickets - oldNumTickets);
+    //cprintf("New numTickets: %d\n", proc->numTickets);
+  }
   return 0;
 }
