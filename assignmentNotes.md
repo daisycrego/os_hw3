@@ -9,13 +9,13 @@ cd /home/root/xv6-public/ && make && make qemu-nox CPUS=1
 ### Overview:
 - Give each process a fixed number of lottery tickets. Effectively giving each process a proportion of the CPU by just giving it that proportion of the tickets.
 - When it comes time to schedule, pick a random number between 1 and the number of tickets.
-- Schedule the process that won the lottery.
+- Schedule the process that won the lottery. The more tickets a process has, the more likely it will be selected by the lottery algorithm.  
 ### Specifics:
-- Take the existing PCB (struct proc) and augment it with a num_tickets field.
 - At scheduling time:
   - Generate a random ticket number winner
   - Loop over processes, keeping a counter
   - If counter >= winner then pick that process
+  - Otherwise, increment the counter by numTickets of the current process and advance to the next process in the queue.
 ### Algorithm:
 For an array of processes (proc[NUM_OF_PROCS]), each with its associated number of tickets (num_tickets):
 ```
@@ -182,7 +182,9 @@ exit(void)
 
 ```
 
+(c) when a process sets its own tickets using the settickets system call.
 
+**STOPPED HERE**
 
 3. Assign new user processes lottery tickets when they are created. A child will be awarded the same number of tickets as their parent in this implementation. Update total number of tickets after each allocation:
   - How:  
