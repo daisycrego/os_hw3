@@ -162,20 +162,9 @@ fork(void)
   safestrcpy(np->name, proc->name, sizeof(proc->name));
 
   pid = np->pid;
-  np->numTickets = proc->numTickets;
+  np->numTickets = proc->numTickets; //Each child gets its parent's numTickets
 
-  //np->numTickets = DEFTICKETS; //Each process has 20 tickets initially (for lottery scheduling).
-  //cprintf("np->numTickets: %d\n", proc->numTickets);
-  //cprintf("cpu->numTicketsTotal: %d\n", cpu->numTicketsTotal);
-  //cprintf("%d is FORKING\n", proc->pid);
-  //procdump();
-  //cprintf("BEFORE: proc->numTickets: %d\n", proc->numTickets);
-  //cprintf("BEFORE: cpu->numTicketsTotal: %d\n", cpu->numTicketsTotal);
   cpu->numTicketsTotal += proc->numTickets;
-  //cprintf("AFTER: cpu->numTicketsTotal: %d\n", cpu->numTicketsTotal);
-  //procdump();
-  //cprintf("Adding tickets... \n");
-  //cprintf("cpu->numTicketsTotal: %d\n", cpu->numTicketsTotal);
 
   // lock to force the compiler to emit the np->state write last.
   acquire(&ptable.lock);
@@ -224,25 +213,12 @@ exit(void)
     }
   }
 
-  //cprintf("Exiting process %d\n", proc->pid);
-  //cprintf("Before tickets are removed:\n");
-  //cprintf("numTickets: %d\n", proc->numTickets);
-  //cprintf("numTicketsTotal: %d\n", cpu->numTicketsTotal);
-  //procdump();
-
   if (cpu->numTicketsTotal - proc->numTickets < 0){
     //cprintf("Failing during exit of %d\n", proc->pid);
     //procdump();
     panic("Negative number of tickets!\n");
   }
   cpu->numTicketsTotal -= proc->numTickets;
-
-
-  //cprintf("After tickets are removed:\n");
-  //cprintf("numTickets: %d\n", proc->numTickets);
-  //cprintf("numTicketsTotal: %d\n", cpu->numTicketsTotal);
-  //procdump();
-
 
   // Jump into the scheduler, never to return.
   proc->state = ZOMBIE;

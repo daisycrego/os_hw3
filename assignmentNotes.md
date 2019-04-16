@@ -34,12 +34,156 @@ for each process in proc[NUM_OF_PROCS]:
 ```
 
 # Execution
-1. Keep track of per-process tickets.
-  - How: Add int numTickets to the process control block (struct proc).
-  - Implementation:
-2. Keep track of total tickets (across all processes).
-  - How: Store int numTicketsTotal along with other per-processor variables (struct cpu).  
-  - Implementation:
+1. **Keep track of per-process tickets.**
+  - **How**: Add int numTickets to the process control block (struct proc).
+  - **Implementation**:
+```c
+// proc.h
+// Per-process state
+struct proc {
+  uint sz;                     // Size of process memory (bytes)
+  pde_t* pgdir;                // Page table
+  char \*kstack;                // Bottom of kernel stack for this process
+  enum procstate state;        // Process state
+  int pid;                     // Process ID
+  struct proc \*parent;         // Parent process
+  struct trapframe \*tf;        // Trap frame for current syscall
+  struct context \*context;     // swtch() here to run process
+  void \*chan;                  // If non-zero, sleeping on chan
+  int killed;                  // If non-zero, have been killed
+  struct file \*ofile[NOFILE];  // Open files
+  struct inode \*cwd;           // Current directory
+  char name[16];               // Process name (debugging)
+  int numTickets;              // Number of tickets (for lottery)
+};
+```
+
+2. **Keep track of total tickets (across all processes).**
+  - **How**:
+    A. Store int numTicketsTotal in CPU state struct (cpu).
+    B. Initialize total to 0 during userinit.
+    C. Make sure that total is updated whenever a process is created or exited.
+  - **Implementation**:
+## A
+Store int numTicketsTotal in CPU state struct (cpu).
+```c
+// proc.h
+// Per-CPU state
+struct cpu {
+  uchar id;                    // Local APIC ID; index into cpus[] below
+  struct context \*scheduler;   // swtch() here to enter scheduler
+  struct taskstate ts;         // Used by x86 to find stack for interrupt
+  struct segdesc gdt[NSEGS];   // x86 global descriptor table
+  volatile uint started;       // Has the CPU started?
+  int ncli;                    // Depth of pushcli nesting.
+  int intena;                  // Were interrupts enabled before pushcli?
+  int numTicketsTotal;         // Total number of tickets awarded across all processes (for lottery scheduling)
+
+  // Cpu-local storage variables; see below
+  struct cpu \*cpu;
+  struct proc \*proc;           // The currently-running process.
+};
+```
+
+## B
+Initialize total tickets to 0 during userinit.
+```c
+//proc.c
+void
+userinit(void)
+{
+  struct proc \*p;
+  extern char \_binary_initcode_start[], \_binary_initcode_size[];
+
+  p = allocproc();
+  initproc = p;
+  if((p->pgdir = setupkvm()) == 0)
+    panic("userinit: out of memory?");
+  inituvm(p->pgdir, \_binary_initcode_start, (int)\_binary_initcode_size);
+  p->sz = PGSIZE;
+  memset(p->tf, 0, sizeof(*p->tf));
+  p->tf->cs = (SEG_UCODE << 3) | DPL_USER;
+  p->tf->ds = (SEG_UDATA << 3) | DPL_USER;
+  p->tf->es = p->tf->ds;
+  p->tf->ss = p->tf->ds;
+  p->tf->eflags = FL_IF;
+  p->tf->esp = PGSIZE;
+  p->tf->eip = 0;  // beginning of initcode.S
+
+  safestrcpy(p->name, "initcode", sizeof(p->name));
+  p->cwd = namei("/");
+
+  cpu->numTicketsTotal = 0;
+
+  p->state = RUNNABLE;
+}
+```
+
+## C
+Make sure that numTicketsTotal is updated whenever a process is (a) created or (b) exited, or (c) when a process sets its own tickets using the settickets system call.
+
+
+(a) created
+```
+int
+fork(void)
+{
+  [...]
+
+  pid = np->pid;
+  np->numTickets = proc->numTickets; //Child gets parent's numTickets
+
+  cpu->numTicketsTotal += proc->numTickets;
+
+  // lock to force the compiler to emit the np->state write last.
+  acquire(&ptable.lock);
+  np->state = RUNNABLE;
+  release(&ptable.lock);
+
+  return pid;
+}
+```
+
+(b) exited
+**@TODO**: Write a test to check how abandoned children are handled. Need to see the actual ticket ratios over time. But anyway, in here when there is a loop over the process table, when abandoned zombies are found and marked as zombie, we need to make sure numTicketsTotal is decremented for each of those zombies. This also leads me to wonder if there are any other corner cases where a process will "exit" without passing through exit?  
+```
+void
+exit(void)
+{
+  struct proc \*p;
+  int fd;
+
+  [...]
+
+  acquire(&ptable.lock);
+
+  // Parent might be sleeping in wait().
+  wakeup1(proc->parent);
+
+  // Pass abandoned children to init.
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->parent == proc){
+      p->parent = initproc;
+      if(p->state == ZOMBIE)
+        wakeup1(initproc);
+    }
+  }
+
+  if (cpu->numTicketsTotal - proc->numTickets < 0){
+    panic("Negative number of tickets!\n");
+  }
+  cpu->numTicketsTotal -= proc->numTickets;
+
+  // Jump into the scheduler, never to return.
+  proc->state = ZOMBIE;
+  sched();
+  panic("zombie exit");
+}
+
+```
+
+
+
 3. Assign new user processes lottery tickets when they are created. A child will be awarded the same number of tickets as their parent in this implementation. Update total number of tickets after each allocation:
   - How:  
     - Most user processes are created by the shell (fork + exec), so award tickets during fork to the child process.
