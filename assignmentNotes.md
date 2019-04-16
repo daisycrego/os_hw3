@@ -122,7 +122,6 @@ userinit(void)
 ## C
 Make sure that numTicketsTotal is updated whenever a process is (a) created or (b) exited, or (c) when a process sets its own tickets using the settickets system call.
 
-
 (a) created
 ```
 int
@@ -145,8 +144,20 @@ fork(void)
 ```
 
 (b) exited
-**@TODO**: Write a test to check how abandoned children are handled. Need to see the actual ticket ratios over time. But anyway, in here when there is a loop over the process table, when abandoned zombies are found and marked as zombie, we need to make sure numTicketsTotal is decremented for each of those zombies. This also leads me to wonder if there are any other corner cases where a process will "exit" without passing through exit?  
+
+Whenever the trap handler is called, if the current user process has been killed, it will be forced to call exit.
 ```
+// trap.c
+// Force process exit if it has been killed and is in user space.
+// (If it is still executing in the kernel, let it keep running
+// until it gets to the regular system call return.)
+if(proc && proc->killed && (tf->cs&3) == DPL_USER)
+  exit();
+```
+
+Modifications to exit:
+```
+// proc.c
 void
 exit(void)
 {
@@ -182,7 +193,26 @@ exit(void)
 
 ```
 
+Whether a process is forced to call exit (i.e. is killed) or exits voluntarily, exit will be called. numTicketsTotal is decremented during exit. Check is made that numTickets <= numTicketsTotal. If it isn't, decrementing will result in a negative numTicketsTotal, which will throw off the algorithm. Having this check in place and running lotterytest hundreds of times without throwing this error indicates that we are never over-decrementing numTicketsTotal or under-allocating numTickets (we were initially failing with this error and it was because sh and init weren't allocated tickets explicitly, outside of fork). **Note**: this doesn't show that were are never over-allocating tickets. There must be a test to run to confirm that numTicketsTotal isn't growing slowly over time ("leaking tickets").
+
+
 (c) when a process sets its own tickets using the settickets system call.
+
+```
+//sysproc.c
+int
+sys_settickets(void){
+  int inputNumTickets;
+  if(argint(0, &inputNumTickets) < 0)
+      return -1;
+  int oldNumTickets = proc->numTickets;
+  proc->numTickets = inputNumTickets;
+  if((cpu->numTicketsTotal + inputNumTickets - oldNumTickets) < 0)
+    return -1
+  cpu->numTicketsTotal += (inputNumTickets - oldNumTickets);
+  return 0;
+}
+```
 
 **STOPPED HERE**
 

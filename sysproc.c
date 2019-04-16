@@ -102,14 +102,12 @@ sys_gettime(void) {
 int
 sys_settickets(void){
   int inputNumTickets;
-  if(argint(0, &inputNumTickets) < 0) //get me the 0th parameter from the user’s stack - argint  is doing “surgery” on the trap frame, and store it in the local pid variable, which is on the kernel stack - effectively we are fishing it out of the user stack and putting it on the kernel stack
+  if(argint(0, &inputNumTickets) < 0)
       return -1;
-  else{
-    //cprintf("inputNumTickets: %d\n", inputNumTickets);
-    int oldNumTickets = proc->numTickets;
-    proc->numTickets = inputNumTickets;
-    cpu->numTicketsTotal += (inputNumTickets - oldNumTickets);
-    //cprintf("New numTickets: %d\n", proc->numTickets);
-  }
-  return 0;
+  int oldNumTickets = proc->numTickets;
+  proc->numTickets = inputNumTickets;
+  if((cpu->numTicketsTotal + inputNumTickets - oldNumTickets) < 0)
+    return -1
+  cpu->numTicketsTotal += (inputNumTickets - oldNumTickets);
+  return 0; 
 }
