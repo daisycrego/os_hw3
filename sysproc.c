@@ -107,7 +107,7 @@ sys_settickets(void){
   int oldNumTickets = proc->numTickets;
   proc->numTickets = inputNumTickets;
   if((cpu->numTicketsTotal + inputNumTickets - oldNumTickets) < 0)
-    return -1
+    return -1;
   cpu->numTicketsTotal += (inputNumTickets - oldNumTickets);
-  return 0; 
+  return 0;
 }

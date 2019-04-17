@@ -5,6 +5,12 @@ cd /home/root/xv6-public/
 cd /home/root/xv6-public/ && make && make qemu-nox CPUS=1
 ```
 
+Or in the VM:
+```
+make
+make qemu CPUS=1 
+```
+
 # Lottery scheduling
 ### Overview:
 - Give each process a fixed number of lottery tickets. Effectively giving each process a proportion of the CPU by just giving it that proportion of the tickets.
