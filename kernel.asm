@@ -8558,7 +8558,6 @@ userinit(void)
 801046e2:	c7 80 b4 00 00 00 00 	movl   $0x0,0xb4(%eax)
 801046e9:	00 00 00 
 
-
   p->state = RUNNABLE;
 801046ec:	8b 45 f4             	mov    -0xc(%ebp),%eax
 801046ef:	c7 40 0c 03 00 00 00 	movl   $0x3,0xc(%eax)
@@ -8775,16 +8774,12 @@ fork(void)
 801048e2:	8b 45 e0             	mov    -0x20(%ebp),%eax
 801048e5:	8b 40 10             	mov    0x10(%eax),%eax
 801048e8:	89 45 dc             	mov    %eax,-0x24(%ebp)
-  np->numTickets = proc->numTickets;
+  np->numTickets = proc->numTickets; //Each child gets its parent's numTickets
 801048eb:	65 a1 04 00 00 00    	mov    %gs:0x4,%eax
 801048f1:	8b 50 7c             	mov    0x7c(%eax),%edx
 801048f4:	8b 45 e0             	mov    -0x20(%ebp),%eax
 801048f7:	89 50 7c             	mov    %edx,0x7c(%eax)
-  //cprintf("cpu->numTicketsTotal: %d\n", cpu->numTicketsTotal);
-  //cprintf("%d is FORKING\n", proc->pid);
-  //procdump();
-  //cprintf("BEFORE: proc->numTickets: %d\n", proc->numTickets);
-  //cprintf("BEFORE: cpu->numTicketsTotal: %d\n", cpu->numTicketsTotal);
+
   cpu->numTicketsTotal += proc->numTickets;
 801048fa:	65 a1 00 00 00 00    	mov    %gs:0x0,%eax
 80104900:	65 8b 15 00 00 00 00 	mov    %gs:0x0,%edx
@@ -8793,9 +8788,6 @@ fork(void)
 80104914:	8b 52 7c             	mov    0x7c(%edx),%edx
 80104917:	01 ca                	add    %ecx,%edx
 80104919:	89 90 b4 00 00 00    	mov    %edx,0xb4(%eax)
-  //procdump();
-  //cprintf("Adding tickets... \n");
-  //cprintf("cpu->numTicketsTotal: %d\n", cpu->numTicketsTotal);
 
   // lock to force the compiler to emit the np->state write last.
   acquire(&ptable.lock);
@@ -8934,10 +8926,10 @@ exit(void)
 80104a43:	83 6d f4 80          	subl   $0xffffff80,-0xc(%ebp)
 80104a47:	81 7d f4 94 63 11 80 	cmpl   $0x80116394,-0xc(%ebp)
 80104a4e:	72 bf                	jb     80104a0f <exit+0xc3>
-  //cprintf("Before tickets are removed:\n");
-  //cprintf("numTickets: %d\n", proc->numTickets);
-  //cprintf("numTicketsTotal: %d\n", cpu->numTicketsTotal);
-  //procdump();
+      if(p->state == ZOMBIE)
+        wakeup1(initproc);
+    }
+  }
 
   if (cpu->numTicketsTotal - proc->numTickets < 0){
 80104a50:	65 a1 00 00 00 00    	mov    %gs:0x0,%eax
@@ -8963,9 +8955,6 @@ exit(void)
 80104a96:	29 d1                	sub    %edx,%ecx
 80104a98:	89 ca                	mov    %ecx,%edx
 80104a9a:	89 90 b4 00 00 00    	mov    %edx,0xb4(%eax)
-  //cprintf("numTicketsTotal: %d\n", cpu->numTicketsTotal);
-  //procdump();
-
 
   // Jump into the scheduler, never to return.
   proc->state = ZOMBIE;
@@ -9106,9 +9095,6 @@ scheduler(void)
 80104bcd:	55                   	push   %ebp
 80104bce:	89 e5                	mov    %esp,%ebp
 80104bd0:	83 ec 28             	sub    $0x28,%esp
-  //cprintf("ENTERING THE SCHEDULER!\n");
-  //procdump();
-
   struct proc *p;
   int foundproc = 1;
 80104bd3:	c7 45 f0 01 00 00 00 	movl   $0x1,-0x10(%ebp)
@@ -12599,7 +12585,7 @@ sys_settickets(void){
 801066de:	89 e5                	mov    %esp,%ebp
 801066e0:	83 ec 28             	sub    $0x28,%esp
   int inputNumTickets;
-  if(argint(0, &inputNumTickets) < 0) //get me the 0th parameter from the user’s stack - argint  is doing “surgery” on the trap frame, and store it in the local pid variable, which is on the kernel stack - effectively we are fishing it out of the user stack and putting it on the kernel stack
+  if(argint(0, &inputNumTickets) < 0)
 801066e3:	8d 45 f0             	lea    -0x10(%ebp),%eax
 801066e6:	89 44 24 04          	mov    %eax,0x4(%esp)
 801066ea:	c7 04 24 00 00 00 00 	movl   $0x0,(%esp)
@@ -12609,17 +12595,17 @@ sys_settickets(void){
       return -1;
 801066fa:	b8 ff ff ff ff       	mov    $0xffffffff,%eax
 801066ff:	eb 3e                	jmp    8010673f <sys_settickets+0x62>
-  else{
-    //cprintf("inputNumTickets: %d\n", inputNumTickets);
-    int oldNumTickets = proc->numTickets;
+  int oldNumTickets = proc->numTickets;
+  proc->numTickets = inputNumTickets;
+  if((cpu->numTicketsTotal + inputNumTickets - oldNumTickets) < 0)
 80106701:	65 a1 04 00 00 00    	mov    %gs:0x4,%eax
 80106707:	8b 40 7c             	mov    0x7c(%eax),%eax
 8010670a:	89 45 f4             	mov    %eax,-0xc(%ebp)
-    proc->numTickets = inputNumTickets;
+    return -1;
 8010670d:	65 a1 04 00 00 00    	mov    %gs:0x4,%eax
 80106713:	8b 55 f0             	mov    -0x10(%ebp),%edx
 80106716:	89 50 7c             	mov    %edx,0x7c(%eax)
-    cpu->numTicketsTotal += (inputNumTickets - oldNumTickets);
+  cpu->numTicketsTotal += (inputNumTickets - oldNumTickets);
 80106719:	65 a1 00 00 00 00    	mov    %gs:0x0,%eax
 8010671f:	65 8b 15 00 00 00 00 	mov    %gs:0x0,%edx
 80106726:	8b 8a b4 00 00 00    	mov    0xb4(%edx),%ecx
@@ -12627,11 +12613,9 @@ sys_settickets(void){
 8010672f:	2b 55 f4             	sub    -0xc(%ebp),%edx
 80106732:	01 ca                	add    %ecx,%edx
 80106734:	89 90 b4 00 00 00    	mov    %edx,0xb4(%eax)
-    //cprintf("New numTickets: %d\n", proc->numTickets);
-  }
   return 0;
-8010673a:	b8 00 00 00 00       	mov    $0x0,%eax
 }
+8010673a:	b8 00 00 00 00       	mov    $0x0,%eax
 8010673f:	c9                   	leave  
 80106740:	c3                   	ret    
 
